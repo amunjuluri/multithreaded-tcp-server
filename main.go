@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-func do(conn net.Conn) {
+const maxConnections = 5
+
+func do(conn net.Conn, semaphore chan struct{}) {
+	defer func() { <-semaphore }()
 	//? 3. to read, we need to read the req, and store it somewhere, so,
 	buff := make([]byte, 1024) //make a byte array,
 	_, err := conn.Read(buff)  // this waits, until the clients sends the request, returns int(number of bytes read), and error
@@ -39,6 +42,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	semaphore := make(chan struct{}, maxConnections)
+
 	for { //? 5. so, to continuosly accept requests, we put this in an infinite for loop
 		fmt.Println("Waiting for Client to Connect")
 		conn, err := listener.Accept() //? 2. now it waits for someone to connect, now we need to read response, write the response, and close the connection
@@ -46,8 +51,8 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Println("Client Connected")
-
-		go do(conn) //? 7 create a simple go routine and it would run a seperate go routine
+		semaphore <- struct{}{}
+		go do(conn, semaphore) //? 7 create a simple go routine and it would run a seperate go routine
 
 	}
 }
